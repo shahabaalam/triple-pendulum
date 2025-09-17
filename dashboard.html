@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Model Comparison Dashboard - Triple Pendulum Chaos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0f;
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(20, 20, 30, 0.8);
+            border-radius: 15px;
+            border: 1px solid rgba(100, 100, 150, 0.3);
+        }
+
+        .dashboard-header h1 {
+            color: #64ff64;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .dashboard-header p {
+            color: #a0a0c0;
+            font-size: 1.1em;
+            max-width: 800px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: rgba(50, 50, 80, 0.8);
+            color: #ffffff;
+            border: 1px solid rgba(100, 150, 255, 0.5);
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: rgba(70, 100, 180, 0.8);
+            transform: translateY(-2px);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .model-container {
+            position: relative;
+            background: rgba(15, 15, 25, 0.9);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(80, 80, 120, 0.4);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .model-header {
+            padding: 15px;
+            background: rgba(30, 30, 50, 0.95);
+            border-bottom: 1px solid rgba(100, 100, 150, 0.3);
+        }
+
+        .model-title {
+            color: #64ff64;
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .model-info {
+            color: #a0a0c0;
+            font-size: 0.9em;
+        }
+
+        .simulation-frame {
+            width: 100%;
+            height: 350px;
+            border: none;
+            background: #000;
+        }
+
+        .comparison-table {
+            margin: 40px auto;
+            max-width: 1200px;
+            background: rgba(20, 20, 30, 0.8);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(100, 100, 150, 0.3);
+        }
+
+        .comparison-table h2 {
+            color: #64ff64;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            color: #e0e0e0;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(100, 100, 150, 0.3);
+        }
+
+        th {
+            background: rgba(40, 40, 60, 0.8);
+            color: #64ff64;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: rgba(50, 50, 80, 0.5);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #a0a0c0;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(6, 1fr);
+            }
+            
+            .dashboard-header h1 {
+                font-size: 2em;
+            }
+        }
+
+        /* Ensure square aspect ratio for containers */
+        .model-container {
+            aspect-ratio: 1;
+        }
+
+        .simulation-frame {
+            height: calc(100% - 80px); /* Account for header height */
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <h1>AI Model Comparison Dashboard</h1>
+        <p>Triple Pendulum Chaos - Comparing 6 different AI implementations of the same physics simulation prompt</p>
+    </div>
+
+    <div class="controls">
+        <button class="control-btn" onclick="controlAllSimulations('play')">▶ Play All</button>
+        <button class="control-btn" onclick="controlAllSimulations('pause')">⏸ Pause All</button>
+        <button class="control-btn" onclick="resetAllSimulations()">↺ Reset All</button>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Claude Sonnet 4 -->
+        <div class="model-container">
+            <div class="model-header">
+                <div class="model-title">Claude Sonnet 4</div>
+                <div class="model-info">Lagrangian mechanics • Matrix solver</div>
+            </div>
+            <iframe src="claude_sonnet_4.html" class="simulation-frame" id="claude-frame"></iframe>
+        </div>
+
+        <!-- DeepSeek V3.1 -->
+        <div class="model-container">
+            <div class="model-header">
+                <div class="model-title">DeepSeek V3.1</div>
+                <div class="model-info">Simplified physics • Responsive design</div>
+            </div>
+            <iframe src="deepseek_v3.1.html" class="simulation-frame" id="deepseek-frame"></iframe>
+        </div>
+
+        <!-- Gemini 2.5 -->
+        <div class="model-container">
+            <div class="model-header">
+                <div class="model-title">Gemini 2.5</div>
+                <div class="model-info">Matrix calculations • Timestamp display</div>
+            </div>
+            <iframe src="gemini2.5.html" class="simulation-frame" id="gemini-frame"></iframe>
+        </div>
+
+        <!-- GPT-5 -->
+        <div class="model-container">
+            <div class="model-header">
+                <div class="model-title">GPT-5</div>
+                <div class="model-info">Verlet integration • Dual canvas</div>
+            </div>
+            <iframe src="gpt5.html" class="simulation-frame" id="gpt-frame"></iframe>
+        </div>
+
+        <!-- Grok 4 -->
+        <div class="model-container">
+            <div class="model-header">
+                <div class="model-title">Grok 4</div>
+                <div class="model-info">Advanced physics • Optimized rendering</div>
+            </div>
+            <iframe src="grok4.html" class="simulation-frame" id="grok-frame"></iframe>
+        </div>
+
+        <!-- Opus 4.1 -->
+        <div class="model-container">
+            <div class="model-header">
+                <div class="model-title">Opus 4.1</div>
+                <div class="model-info">Gradient background • Performance optimized</div>
+            </div>
+            <iframe src="opus4.1.html" class="simulation-frame" id="opus-frame"></iframe>
+        </div>
+    </div>
+
+    <div class="comparison-table">
+        <h2>Implementation Comparison</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Physics Approach</th>
+                    <th>Visual Features</th>
+                    <th>Performance</th>
+                    <th>Special Features</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Claude Sonnet 4</td>
+                    <td>Lagrangian mechanics with 3x3 matrix solver</td>
+                    <td>Clean dark theme, smooth trail rendering</td>
+                    <td>High accuracy physics</td>
+                    <td>Precise mathematical implementation</td>
+                </tr>
+                <tr>
+                    <td>DeepSeek V3.1</td>
+                    <td>Simplified physics model</td>
+                    <td>Semi-transparent trails, responsive design</td>
+                    <td>Lightweight and fast</td>
+                    <td>Varying mass/length ratios</td>
+                </tr>
+                <tr>
+                    <td>Gemini 2.5</td>
+                    <td>Complete physics with matrix calculations</td>
+                    <td>Equal pendulum parameters, timestamp display</td>
+                    <td>Balanced performance</td>
+                    <td>Clean implementation</td>
+                </tr>
+                <tr>
+                    <td>GPT-5</td>
+                    <td>Verlet integration + distance constraints</td>
+                    <td>Dual canvas system, advanced trail fading</td>
+                    <td>Optimized for stability</td>
+                    <td>Device pixel ratio aware</td>
+                </tr>
+                <tr>
+                    <td>Grok 4</td>
+                    <td>Advanced physics calculations</td>
+                    <td>Optimized rendering techniques</td>
+                    <td>High performance</td>
+                    <td>Modern implementation approach</td>
+                </tr>
+                <tr>
+                    <td>Opus 4.1</td>
+                    <td>Performance-optimized physics</td>
+                    <td>Gradient background, elegant color scheme</td>
+                    <td>Fastest execution</td>
+                    <td>Optimized for smooth animation</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        <p>Built for clean visuals and maximum chaos: true gravitational dynamics, elegant trail rendering, zero UI distractions.</p>
+        <p>Observe the butterfly effect in computational physics - small implementation differences lead to dramatically different long-term behaviors.</p>
+    </div>
+
+    <script>
+        function controlAllSimulations(action) {
+            const frames = document.querySelectorAll('.simulation-frame');
+            frames.forEach(frame => {
+                try {
+                    if (action === 'play') {
+                        frame.contentWindow.postMessage('play', '*');
+                    } else if (action === 'pause') {
+                        frame.contentWindow.postMessage('pause', '*');
+                    }
+                } catch (e) {
+                    console.log('Could not control frame:', frame.id);
+                }
+            });
+        }
+
+        function resetAllSimulations() {
+            const frames = document.querySelectorAll('.simulation-frame');
+            frames.forEach(frame => {
+                try {
+                    // Reload the iframe to reset the simulation
+                    frame.src = frame.src;
+                } catch (e) {
+                    console.log('Could not reset frame:', frame.id);
+                }
+            });
+        }
+
+        // Listen for messages from iframes (if they support it)
+        window.addEventListener('message', function(event) {
+            // Handle messages from simulations if needed
+        });
+
+        // Ensure iframes load properly
+        document.addEventListener('DOMContentLoaded', function() {
+            const frames = document.querySelectorAll('.simulation-frame');
+            frames.forEach(frame => {
+                frame.addEventListener('load', function() {
+                    console.log('Simulation loaded:', this.id);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

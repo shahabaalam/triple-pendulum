@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Triple Pendulum</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+</head>
+
+<body>
+    <script>
+        let g = 9.81; // Gravity (m/s^2)
+        let l1 = 100, l2 = 100, l3 = 100; // Lengths of pendulum arms (pixels)
+        let m1 = 10, m2 = 10, m3 = 10; // Masses of bobs (kg)
+        let a1 = Math.PI / 2, a2 = Math.PI / 2, a3 = Math.PI / 2; // Initial angles
+        let a1_v = 0, a2_v = 0, a3_v = 0; // Angular velocities
+        let a1_a = 0, a2_a = 0, a3_a = 0; // Angular accelerations
+        let dt = 0.02; // Time step
+        let trail1 = [], trail2 = [], trail3 = []; // Trails for each bob
+        let maxTrail = 100; // Maximum trail points
+        let cx, cy; // Canvas center
+
+        function setup() {
+            createCanvas(800, 600);
+            cx = width / 2;
+            cy = 200;
+        }
+
+        function draw() {
+            background(0); // Black background
+            updatePendulum();
+            drawPendulum();
+        }
+
+        function updatePendulum() {
+            // Equations of motion for triple pendulum (Lagrangian mechanics)
+            let num1 = -g * (2 * m1 + m2 + m3) * sin(a1);
+            let num2 = -m2 * g * sin(a1 - 2 * a2);
+            let num3 = -m3 * g * sin(a1 - 2 * a3);
+            let num4 = -2 * sin(a1 - a2) * m2 * (a2_v * a2_v * l2 + a1_v * a1_v * l1 * cos(a1 - a2));
+            let num5 = -2 * sin(a1 - a3) * m3 * (a3_v * a3_v * l3 + a1_v * a1_v * l1 * cos(a1 - a3));
+            let den1 = l1 * (2 * m1 + m2 + m3 - m2 * cos(2 * a1 - 2 * a2) - m3 * cos(2 * a1 - 2 * a3));
+            a1_a = (num1 + num2 + num3 + num4 + num5) / den1;
+
+            let num6 = 2 * sin(a1 - a2);
+            let num7 = a1_v * a1_v * l1 * (m1 + m2 + m3);
+            let num8 = g * (m1 + m2 + m3) * cos(a1);
+            let num9 = a2_v * a2_v * l2 * m2 * cos(a1 - a2);
+            let num10 = a3_v * a3_v * l3 * m3 * cos(a1 - a3);
+            let den2 = l2 * (2 * m1 + m2 + m3 - m2 * cos(2 * a1 - 2 * a2));
+            a2_a = (num6 * (num7 + num8 + num9 + num10)) / den2;
+
+            let num11 = 2 * sin(a1 - a3);
+            let num12 = a1_v * a1_v * l1 * (m1 + m2 + m3);
+            let num13 = g * (m1 + m2 + m3) * cos(a1);
+            let num14 = a2_v * a2_v * l2 * m2 * cos(a1 - a2);
+            let num15 = a3_v * a3_v * l3 * m3 * cos(a1 - a3);
+            let den3 = l3 * (2 * m1 + m2 + m3 - m3 * cos(2 * a1 - 2 * a3));
+            a3_a = (num11 * (num12 + num13 + num14 + num15)) / den3;
+
+            // Update velocities
+            a1_v += a1_a * dt;
+            a2_v += a2_a * dt;
+            a3_v += a3_a * dt;
+
+            // Update angles
+            a1 += a1_v * dt;
+            a2 += a2_v * dt;
+            a3 += a3_v * dt;
+        }
+
+        function drawPendulum() {
+            // Calculate bob positions
+            let x1 = cx + l1 * sin(a1);
+            let y1 = cy + l1 * cos(a1);
+            let x2 = x1 + l2 * sin(a2);
+            let y2 = y1 + l2 * cos(a2);
+            let x3 = x2 + l3 * sin(a3);
+            let y3 = y2 + l3 * cos(a3);
+
+            // Update trails
+            trail1.push({ x: x1, y: y1, alpha: 255 });
+            trail2.push({ x: x2, y: y2, alpha: 255 });
+            trail3.push({ x: x3, y: y3, alpha: 255 });
+            if (trail1.length > maxTrail) trail1.shift();
+            if (trail2.length > maxTrail) trail2.shift();
+            if (trail3.length > maxTrail) trail3.shift();
+
+            // Draw trails
+            for (let i = 0; i < trail1.length; i++) {
+                let alpha = trail1[i].alpha * (1 - i / trail1.length);
+                noStroke();
+                fill(255, 0, 0, alpha); // Red for bob 1
+                ellipse(trail1[i].x, trail1[i].y, 4, 4);
+                fill(0, 255, 0, alpha); // Green for bob 2
+                ellipse(trail2[i].x, trail2[i].y, 4, 4);
+                fill(0, 0, 255, alpha); // Blue for bob 3
+                ellipse(trail3[i].x, trail3[i].y, 4, 4);
+            }
+
+            // Draw arms and bobs
+            stroke(255);
+            strokeWeight(2);
+            line(cx, cy, x1, y1);
+            line(x1, y1, x2, y2);
+            line(x2, y2, x3, y3);
+            noStroke();
+            fill(255, 0, 0); // Red for bob 1
+            ellipse(x1, y1, 10, 10);
+            fill(0, 255, 0); // Green for bob 2
+            ellipse(x2, y2, 10, 10);
+            fill(0, 0, 255); // Blue for bob 3
+            ellipse(x3, y3, 10, 10);
+
+            // Fade trails
+            for (let i = 0; i < trail1.length; i++) {
+                trail1[i].alpha -= 255 / maxTrail;
+                trail2[i].alpha -= 255 / maxTrail;
+                trail3[i].alpha -= 255 / maxTrail;
+            }
+        }
+    </script>
+</body>
+
+</html>
