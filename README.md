@@ -45,7 +45,7 @@ To use the dashboard, simply open `dashboard.html` in your browser after cloning
 
 ## YouTube Comparison Video
 
-Watch our detailed comparison analysis on YouTube: [Triple Pendulum AI Models Comparison](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
+Watch on YouTube: [I Gave the Same Prompt to 6 Popular AI Models](https://youtube.com/shorts/As0cT0Yr-8I?feature=share)
 
 ## Viewing Instructions
 
