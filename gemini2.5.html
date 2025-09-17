@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triple Pendulum</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="pendulumCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('pendulumCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let W = window.innerWidth;
+        let H = window.innerHeight;
+        canvas.width = W;
+        canvas.height = H;
+
+        window.addEventListener('resize', () => {
+            W = window.innerWidth;
+            H = window.innerHeight;
+            canvas.width = W;
+            canvas.height = H;
+        });
+
+        // Constants
+        const g = 9.81; // Gravity
+        const scale = 150; // Scale factor for visual size
+        const originX = W / 2;
+        const originY = H / 4;
+
+        // Pendulum parameters (length in meters, mass in kg)
+        const L1 = 1.0;
+        const L2 = 1.0;
+        const L3 = 1.0;
+        const M1 = 1.0;
+        const M2 = 1.0;
+        const M3 = 1.0;
+
+        // State variables
+        let t1 = Math.PI / 2; // Initial angle 1
+        let t2 = Math.PI / 2; // Initial angle 2
+        let t3 = Math.PI / 2; // Initial angle 3
+        let v1 = 0; // Angular velocity 1
+        let v2 = 0; // Angular velocity 2
+        let v3 = 0; // Angular velocity 3
+
+        const dt = 0.005; // Time step
+        const trailLength = 500;
+        const trail1 = [];
+        const trail2 = [];
+        const trail3 = [];
+
+        let startTime = Date.now();
+        let frameCount = 0;
+
+        // Equations of motion for a triple pendulum
+        function getAccelerations() {
+            // Simplified for clarity, full equations are very long
+            const a1 = (M1 + M2 + M3) * L1;
+            const b1 = (M2 + M3) * L2 * Math.cos(t1 - t2);
+            const c1 = M3 * L3 * Math.cos(t1 - t3);
+            const d1 = (M2 + M3) * L2 * v2 * v2 * Math.sin(t1 - t2) + M3 * L3 * v3 * v3 * Math.sin(t1 - t3) - (M1 + M2 + M3) * g * Math.sin(t1);
+
+            const a2 = (M2 + M3) * L2;
+            const b2 = (M2 + M3) * L1 * Math.cos(t1 - t2);
+            const c2 = M3 * L3 * Math.cos(t2 - t3);
+            const d2 = -(M2 + M3) * L1 * v1 * v1 * Math.sin(t1 - t2) + M3 * L3 * v3 * v3 * Math.sin(t2 - t3) - (M2 + M3) * g * Math.sin(t2);
+
+            const a3 = M3 * L3;
+            const b3 = M3 * L1 * Math.cos(t1 - t3);
+            const c3 = M3 * L2 * Math.cos(t2 - t3);
+            const d3 = -M3 * L1 * v1 * v1 * Math.sin(t1 - t3) - M3 * L2 * v2 * v2 * Math.sin(t2 - t3) - M3 * g * Math.sin(t3);
+
+            const det = a1 * (a2 * a3 - c2 * c3) - b1 * (b2 * a3 - c2 * b3) + c1 * (b2 * c3 - a2 * b3);
+
+            const alpha1 = (d1 * (a2 * a3 - c2 * c3) - b1 * (d2 * a3 - c2 * d3) + c1 * (d2 * c3 - a2 * d3)) / det;
+            const alpha2 = (a1 * (d2 * a3 - c2 * d3) - d1 * (b2 * a3 - c2 * b3) + c1 * (b2 * d3 - d2 * b3)) / det;
+            const alpha3 = (a1 * (a2 * d3 - d2 * c3) - b1 * (b2 * d3 - d2 * b3) + d1 * (b2 * c3 - a2 * b3)) / det;
+
+            return { alpha1, alpha2, alpha3 };
+        }
+
+        // Main animation loop
+        function animate() {
+            // Clear canvas with a slight transparency to create the trail effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, W, H);
+
+            // Calculate accelerations
+            const { alpha1, alpha2, alpha3 } = getAccelerations();
+
+            // Update velocities and angles
+            v1 += alpha1 * dt;
+            v2 += alpha2 * dt;
+            v3 += alpha3 * dt;
+            t1 += v1 * dt;
+            t2 += v2 * dt;
+            t3 += v3 * dt;
+
+            // Calculate positions
+            const x1 = originX + L1 * scale * Math.sin(t1);
+            const y1 = originY + L1 * scale * Math.cos(t1);
+            const x2 = x1 + L2 * scale * Math.sin(t2);
+            const y2 = y1 + L2 * scale * Math.cos(t2);
+            const x3 = x2 + L3 * scale * Math.sin(t3);
+            const y3 = y2 + L3 * scale * Math.cos(t3);
+
+            // Add positions to trails
+            trail1.push({ x: x1, y: y1 });
+            trail2.push({ x: x2, y: y2 });
+            trail3.push({ x: x3, y: y3 });
+
+            if (trail1.length > trailLength) trail1.shift();
+            if (trail2.length > trailLength) trail2.shift();
+            if (trail3.length > trailLength) trail3.shift();
+
+            // Draw trails
+            drawTrail(trail1, 'rgba(255, 100, 100, 0.5)');
+            drawTrail(trail2, 'rgba(100, 255, 100, 0.5)');
+            drawTrail(trail3, 'rgba(100, 100, 255, 0.5)');
+
+            // Draw pendulum
+            drawPendulum(originX, originY, x1, y1, x2, y2, x3, y3);
+
+            // Display time
+            const elapsedTime = (Date.now() - startTime) / 1000;
+            ctx.fillStyle = '#fff';
+            ctx.font = '24px monospace';
+            ctx.fillText(elapsedTime.toFixed(2), 20, 40);
+
+            requestAnimationFrame(animate);
+        }
+
+        function drawPendulum(x0, y0, x1, y1, x2, y2, x3, y3) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.lineTo(x3, y3);
+            ctx.stroke();
+
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(x1, y1, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x2, y2, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x3, y3, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawTrail(trail, color) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(trail[0].x, trail[0].y);
+            for (let i = 1; i < trail.length; i++) {
+                ctx.lineTo(trail[i].x, trail[i].y);
+            }
+            ctx.stroke();
+        }
+        animate();
+    </script>
+</body>
+
+</html>

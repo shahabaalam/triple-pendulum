@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Triple Pendulum — Pure Chaos (No UI)</title>
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: #0b0c0f;
+            /* very dark */
+            color: #ddd;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            position: fixed;
+            inset: 0;
+        }
+
+        /* No UI elements visible. Keep only a tiny unobtrusive note in source/console. */
+    </style>
+</head>
+
+<body>
+    <!--
+  Triple Pendulum (Verlet + Distance Constraints)
+  - No controls, no UI interactions.
+  - Trails: separate persistent canvas with slow fade.
+  - Anchor: top-center of the canvas.
+  - Highly chaotic behavior by default. Try resizing the window.
+  - If you want to "save" a frame, use your browser's screenshot or save the canvas image manually.
+-->
+    <canvas id="trail"></canvas>
+    <canvas id="main"></canvas>
+
+    <script>
+        (() => {
+            const G = 980; // px/s^2 - scaled gravity (pixels). Tuned for good visuals.
+            const FPS = 60;
+            const dt = 1 / FPS;
+
+            const trailCanvas = document.getElementById('trail');
+            const mainCanvas = document.getElementById('main');
+            const trailCtx = trailCanvas.getContext('2d', { alpha: true });
+            const ctx = mainCanvas.getContext('2d', { alpha: true });
+
+            // Resize to full window device pixel ratio aware
+            function resize() {
+                const DPR = window.devicePixelRatio || 1;
+                const w = innerWidth;
+                const h = innerHeight;
+                trailCanvas.width = Math.round(w * DPR);
+                trailCanvas.height = Math.round(h * DPR);
+                mainCanvas.width = trailCanvas.width;
+                mainCanvas.height = trailCanvas.height;
+                trailCanvas.style.width = mainCanvas.style.width = w + 'px';
+                trailCanvas.style.height = mainCanvas.style.height = h + 'px';
+                trailCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+                ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+                // Clear main (we draw every frame); leave trails to persist
+                ctx.clearRect(0, 0, w, h);
+            }
+            addEventListener('resize', resize, { passive: true });
+            resize();
+
+            // Anchor point (pivot)
+            function getAnchor() {
+                return { x: innerWidth * 0.5, y: innerHeight * 0.12 };
+            }
+
+            // Particle structure for Verlet integration
+            function Particle(x, y) {
+                this.x = x;
+                this.y = y;
+                this.px = x; // previous x
+                this.py = y; // previous y
+                this.ax = 0;
+                this.ay = 0;
+                this.mass = 1;
+            }
+            Particle.prototype.applyAcceleration = function (ax, ay) {
+                this.ax += ax;
+                this.ay += ay;
+            };
+            Particle.prototype.verlet = function (dt, damping = 1.0) {
+                const nx = this.x + (this.x - this.px) * damping + this.ax * dt * dt;
+                const ny = this.y + (this.y - this.py) * damping + this.ay * dt * dt;
+                this.px = this.x;
+                this.py = this.y;
+                this.x = nx;
+                this.y = ny;
+                this.ax = 0;
+                this.ay = 0;
+            };
+
+            // create pendulum: anchor -> p1 -> p2 -> p3
+            const anchor = getAnchor();
+            // lengths scaled to window size
+            let L1 = Math.min(innerHeight, innerWidth) * 0.18;
+            let L2 = Math.min(innerHeight, innerWidth) * 0.18;
+            let L3 = Math.min(innerHeight, innerWidth) * 0.18;
+
+            // initialize positions with small offsets to encourage chaos
+            function initParticles() {
+                const a = getAnchor();
+                const theta1 = Math.PI / 2 + 0.08;
+                const theta2 = Math.PI / 2 - 0.25;
+                const theta3 = Math.PI / 2 + 0.15;
+                const p1 = new Particle(a.x + L1 * Math.sin(theta1), a.y + L1 * Math.cos(theta1));
+                const p2 = new Particle(p1.x + L2 * Math.sin(theta2), p1.y + L2 * Math.cos(theta2));
+                const p3 = new Particle(p2.x + L3 * Math.sin(theta3), p2.y + L3 * Math.cos(theta3));
+                // small random kick in previous positions to seed velocity
+                p1.px -= 0.5;
+                p2.px -= 0.8;
+                p3.px += 0.3;
+                return [p1, p2, p3];
+            }
+
+            let parts = initParticles();
+
+            // update lengths if resizing
+            function recomputeLengths() {
+                L1 = Math.min(innerHeight, innerWidth) * 0.18;
+                L2 = Math.min(innerHeight, innerWidth) * 0.18;
+                L3 = Math.min(innerHeight, innerWidth) * 0.18;
+            }
+
+            // Constraint solver: keep distances fixed (anchor-p1, p1-p2, p2-p3)
+            function satisfyConstraints(iterations = 6) {
+                const anchorPos = getAnchor();
+                // anchor to p1
+                for (let k = 0; k < iterations; k++) {
+                    // anchor-p1
+                    let p1 = parts[0];
+                    let dx = p1.x - anchorPos.x;
+                    let dy = p1.y - anchorPos.y;
+                    let dist = Math.hypot(dx, dy) || 1e-6;
+                    let err = dist - L1;
+                    let nx = dx / dist;
+                    let ny = dy / dist;
+                    // anchor is fixed -> move p1 only
+                    p1.x -= nx * err;
+                    p1.y -= ny * err;
+
+                    // p1-p2
+                    let p2 = parts[1];
+                    dx = p2.x - p1.x;
+                    dy = p2.y - p1.y;
+                    dist = Math.hypot(dx, dy) || 1e-6;
+                    err = dist - L2;
+                    nx = dx / dist;
+                    ny = dy / dist;
+                    // move both proportional to masses (equal mass => half each)
+                    const corr = 0.5;
+                    p1.x += nx * err * corr;
+                    p1.y += ny * err * corr;
+                    p2.x -= nx * err * corr;
+                    p2.y -= ny * err * corr;
+
+                    // p2-p3
+                    let p3 = parts[2];
+                    dx = p3.x - p2.x;
+                    dy = p3.y - p2.y;
+                    dist = Math.hypot(dx, dy) || 1e-6;
+                    err = dist - L3;
+                    nx = dx / dist;
+                    ny = dy / dist;
+                    p2.x += nx * err * 0.5;
+                    p2.y += ny * err * 0.5;
+                    p3.x -= nx * err * 0.5;
+                    p3.y -= ny * err * 0.5;
+                }
+            }
+
+            // Trail styling parameters
+            const colors = ['#66d9ff', '#ff79c6', '#ffd866']; // each mass color
+            const massR = Math.max(3, Math.min(9, Math.floor(Math.min(innerWidth, innerHeight) / 160)));
+            // prepare trail canvas initial background (fully transparent)
+            trailCtx.clearRect(0, 0, innerWidth, innerHeight);
+
+            // draw one frame
+            function step() {
+                recomputeLengths();
+                const anchorPos = getAnchor();
+                // apply gravity to particles
+                for (let p of parts) {
+                    p.applyAcceleration(0, G);
+                }
+                // verlet integrate
+                for (let p of parts) {
+                    // tiny damping near 1.0 (1.0 = no energy loss). Use 0.999 for slight numeric stability
+                    p.verlet(dt, 0.9999);
+                }
+                // satisfy constraints (multiple iterations for stiffness)
+                satisfyConstraints(8);
+
+                // Add trail: draw small circles or tiny line segment for each mass onto the trail canvas.
+                // We render each mass's movement as a faint stroke; trail canvas slowly fades each frame below.
+                for (let i = 0; i < 3; i++) {
+                    const p = parts[i];
+                    trailCtx.beginPath();
+                    trailCtx.fillStyle = colors[i];
+                    // draw a 1px filled rectangle for a crisp long trail (will be faded)
+                    trailCtx.globalAlpha = 0.08; // blending so trails build up
+                    trailCtx.fillRect(p.x - 1.2, p.y - 1.2, 2.4, 2.4);
+                }
+                trailCtx.globalAlpha = 1.0;
+
+                // fade the trail canvas gently by drawing a translucent rect on top
+                // Use 'destination-out' trick? Simpler: draw a translucent rectangle with background color alpha
+                trailCtx.fillStyle = 'rgba(11,12,15,0.015)'; // very slow fade
+                trailCtx.fillRect(0, 0, innerWidth, innerHeight);
+
+                // Render main (rods + masses)
+                ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+                // draw rods with soft lines
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = 'rgba(200,200,200,0.12)';
+                ctx.beginPath();
+                ctx.moveTo(anchorPos.x, anchorPos.y);
+                ctx.lineTo(parts[0].x, parts[0].y);
+                ctx.lineTo(parts[1].x, parts[1].y);
+                ctx.lineTo(parts[2].x, parts[2].y);
+                ctx.stroke();
+
+                // add subtle glow by stroking with low alpha thicker
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+                ctx.beginPath();
+                ctx.moveTo(anchorPos.x, anchorPos.y);
+                ctx.lineTo(parts[0].x, parts[0].y);
+                ctx.lineTo(parts[1].x, parts[1].y);
+                ctx.lineTo(parts[2].x, parts[2].y);
+                ctx.stroke();
+
+                // Draw masses
+                for (let i = 0; i < 3; i++) {
+                    const p = parts[i];
+                    // draw outer glow
+                    ctx.beginPath();
+                    ctx.fillStyle = colors[i];
+                    ctx.globalAlpha = 0.075;
+                    ctx.arc(p.x, p.y, massR * 2.6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+
+                    // core circle
+                    ctx.beginPath();
+                    ctx.fillStyle = colors[i];
+                    ctx.arc(p.x, p.y, massR, 0, Math.PI * 2);
+                    ctx.fill();
+                    // subtle rim
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                    ctx.stroke();
+                }
+
+                // anchor point
+                ctx.beginPath();
+                ctx.fillStyle = '#ffffff';
+                ctx.globalAlpha = 0.08;
+                ctx.arc(anchorPos.x, anchorPos.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Animation loop using rAF; keep time clamped for stability
+            let last = performance.now();
+            let acc = 0;
+            function animate(t) {
+                const elapsed = Math.min(40, t - last); // clamp to avoid huge steps after tab switch
+                last = t;
+                acc += elapsed;
+                // run fixed-step updates to keep physics stable
+                while (acc >= (1000 * dt)) {
+                    step();
+                    acc -= (1000 * dt);
+                }
+                requestAnimationFrame(animate);
+            }
+
+            // Re-init on double-click (no UI but helpful for new pattern) - but user requested no interactions.
+            // We'll only re-init if user intentionally double-clicks the background.
+            addEventListener('dblclick', () => {
+                // reinitialize with a different random seed to explore patterns
+                parts = initParticles();
+                // tiny random perturbations to previous positions for variety
+                parts.forEach((p, i) => {
+                    p.px = p.x + (Math.random() - 0.5) * 2 * (i + 1);
+                    p.py = p.y + (Math.random() - 0.5) * 2 * (i + 1);
+                });
+                // clear trails
+                trailCtx.clearRect(0, 0, innerWidth, innerHeight);
+            });
+
+            // small instruction in console for saving/restarting (keeps UI clean)
+            console.log("Triple Pendulum running — Trails persist. To reseed patterns double-click anywhere. Use browser screenshot to save frames.");
+
+            // Kick off animation
+            requestAnimationFrame((t) => { last = t; requestAnimationFrame(animate); });
+
+        })();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triple Pendulum Chaos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a0a2a 100%);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #timer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="timer">00:00</div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const timer = document.getElementById('timer');
+
+        // Canvas setup
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Pendulum parameters
+        const g = 9.81;
+        const dt = 0.01;
+        const origin = { x: canvas.width / 2, y: canvas.height / 3 };
+
+        // Triple pendulum properties
+        const L1 = 100, L2 = 100, L3 = 100;  // Lengths
+        const m1 = 10, m2 = 10, m3 = 10;     // Masses
+
+        // Initial conditions - slight asymmetry for chaos
+        let a1 = Math.PI * 0.5 + 0.01;
+        let a2 = Math.PI * 0.5;
+        let a3 = Math.PI * 0.5;
+        let a1_v = 0, a2_v = 0, a3_v = 0;
+
+        // Trail system
+        const trails = [[], [], []];
+        const maxTrailLength = 800;
+        const trailColors = [
+            'rgba(255, 100, 100, ',
+            'rgba(100, 255, 150, ',
+            'rgba(100, 150, 255, '
+        ];
+
+        // Time tracking
+        let startTime = Date.now();
+        let frameCount = 0;
+
+        // Calculate accelerations using Lagrangian mechanics
+        function calculateAccelerations() {
+            // Simplified equations for triple pendulum
+            const s1 = Math.sin(a1);
+            const c1 = Math.cos(a1);
+            const s2 = Math.sin(a2);
+            const c2 = Math.cos(a2);
+            const s3 = Math.sin(a3);
+            const c3 = Math.cos(a3);
+            const s12 = Math.sin(a1 - a2);
+            const c12 = Math.cos(a1 - a2);
+            const s23 = Math.sin(a2 - a3);
+            const c23 = Math.cos(a2 - a3);
+            const s13 = Math.sin(a1 - a3);
+            const c13 = Math.cos(a1 - a3);
+
+            // Mass combinations
+            const M1 = m1 + m2 + m3;
+            const M2 = m2 + m3;
+            const M3 = m3;
+
+            // Denominator terms
+            const den1 = L1 * (M1 - M2 * c12 * c12 - M3 * c13 * c13);
+            const den2 = L2 * (M2 - M3 * c23 * c23);
+            const den3 = L3 * M3;
+
+            // Angular accelerations (simplified)
+            const num1 = -g * (M1 * s1 + M2 * L2 / L1 * a2_v * a2_v * s12 + M3 * L3 / L1 * a3_v * a3_v * s13);
+            const num2 = -g * (M2 * s2 - M2 * L1 / L2 * a1_v * a1_v * s12 + M3 * L3 / L2 * a3_v * a3_v * s23);
+            const num3 = -g * (M3 * s3 - M3 * L1 / L3 * a1_v * a1_v * s13 - M3 * L2 / L3 * a2_v * a2_v * s23);
+
+            // Apply damping for stability
+            const damping = 0.999;
+
+            return {
+                a1_a: (num1 / den1) * damping,
+                a2_a: (num2 / den2) * damping,
+                a3_a: (num3 / den3) * damping
+            };
+        }
+
+        // Update physics
+        function update() {
+            const acc = calculateAccelerations();
+
+            // Velocity Verlet integration
+            a1_v += acc.a1_a * dt;
+            a2_v += acc.a2_a * dt;
+            a3_v += acc.a3_a * dt;
+
+            a1 += a1_v * dt;
+            a2 += a2_v * dt;
+            a3 += a3_v * dt;
+
+            // Calculate positions
+            const x1 = origin.x + L1 * Math.sin(a1);
+            const y1 = origin.y + L1 * Math.cos(a1);
+            const x2 = x1 + L2 * Math.sin(a2);
+            const y2 = y1 + L2 * Math.cos(a2);
+            const x3 = x2 + L3 * Math.sin(a3);
+            const y3 = y2 + L3 * Math.cos(a3);
+
+            // Update trails
+            trails[0].push({ x: x1, y: y1 });
+            trails[1].push({ x: x2, y: y2 });
+            trails[2].push({ x: x3, y: y3 });
+
+            // Limit trail length
+            trails.forEach(trail => {
+                if (trail.length > maxTrailLength) {
+                    trail.shift();
+                }
+            });
+
+            return { x1, y1, x2, y2, x3, y3 };
+        }
+
+        // Render everything
+        function render(positions) {
+            // Subtle fade effect
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw trails
+            trails.forEach((trail, index) => {
+                if (trail.length < 2) return;
+
+                ctx.beginPath();
+                for (let i = 1; i < trail.length; i++) {
+                    const opacity = (i / trail.length) * 0.6;
+                    ctx.strokeStyle = trailColors[index] + opacity + ')';
+                    ctx.lineWidth = 1 + (i / trail.length) * 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+                    ctx.lineTo(trail[i].x, trail[i].y);
+                    ctx.stroke();
+                }
+            });
+
+            // Draw pendulum arms
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(positions.x1, positions.y1);
+            ctx.lineTo(positions.x2, positions.y2);
+            ctx.lineTo(positions.x3, positions.y3);
+            ctx.stroke();
+
+            // Draw pivot
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.beginPath();
+            ctx.arc(origin.x, origin.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw bobs with glow
+            const bobPositions = [
+                { x: positions.x1, y: positions.y1, color: 'rgb(255, 100, 100)' },
+                { x: positions.x2, y: positions.y2, color: 'rgb(100, 255, 150)' },
+                { x: positions.x3, y: positions.y3, color: 'rgb(100, 150, 255)' }
+            ];
+
+            bobPositions.forEach((bob, i) => {
+                // Glow effect
+                const gradient = ctx.createRadialGradient(bob.x, bob.y, 0, bob.x, bob.y, 20);
+                gradient.addColorStop(0, bob.color);
+                gradient.addColorStop(1, 'transparent');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(bob.x, bob.y, 20, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Bob
+                ctx.fillStyle = bob.color;
+                ctx.beginPath();
+                ctx.arc(bob.x, bob.y, 6 + i * 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Update timer
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Animation loop
+        function animate() {
+            frameCount++;
+
+            // Multiple physics updates per frame for accuracy
+            for (let i = 0; i < 5; i++) {
+                const positions = update();
+                if (i === 4) {
+                    render(positions);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Start animation
+        animate();
+    </script>
+</body>
+
+</html>
